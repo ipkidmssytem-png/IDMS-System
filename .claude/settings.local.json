@@ -9,7 +9,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sharu\\\\Documents\\\\IDMS-System\\\\public\" -Recurse -Force)",
       "Bash(Select-Object FullName, Length, LastWriteTime)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sharu\\\\Documents\\\\IDMS-System\\\\src\" -Filter \"*.jsx\" -Recurse)",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(npm run *)"
     ]
   }
 }

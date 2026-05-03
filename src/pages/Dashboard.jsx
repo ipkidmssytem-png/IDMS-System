@@ -524,6 +524,12 @@ function BarChartSvg({ data }) {
 export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [barChartYear, setBarChartYear] = useState(null);
   const [activeModal, setActiveModal] = useState(null); // "viewed" | "processed" | "total" | null
   const navigate = useNavigate();
@@ -531,13 +537,19 @@ export default function Dashboard() {
   useEffect(() => {
     const q = query(collection(db, "documents"), orderBy("createdAt", "desc"));
 
-    const unsub = onSnapshot(q, (snap) => {
-      const rows = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-      setDocuments(rows);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const rows = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setDocuments(rows);
+      },
+      (err) => {
+        console.error("Dashboard documents subscription failed:", err);
+      }
+    );
 
     return () => unsub();
   }, []);
@@ -555,7 +567,7 @@ export default function Dashboard() {
   }, [activeModal]);
 
   const filteredDocuments = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword = debouncedSearch.trim().toLowerCase();
     if (!keyword) return documents;
 
     return documents.filter((doc) => {
@@ -566,11 +578,10 @@ export default function Dashboard() {
         String(doc.title || "").toLowerCase().includes(keyword) ||
         String(doc.type || "").toLowerCase().includes(keyword) ||
         deptStr.includes(keyword) ||
-        String(doc.direction || "").toLowerCase().includes(keyword) ||
         String(doc.status || "").toLowerCase().includes(keyword)
       );
     });
-  }, [documents, search]);
+  }, [documents, debouncedSearch]);
 
   const availableBarYears = useMemo(() => {
     const yrs = new Set();
@@ -593,7 +604,9 @@ export default function Dashboard() {
     const totalCount = filteredDocuments.length;
 
     const pendingDocs = filteredDocuments.filter(
-      (d) => !d.status || String(d.status).toLowerCase() === "pending"
+      (d) =>
+        (!d.status || String(d.status).toLowerCase() === "pending") &&
+        d.viewed !== true
     );
 
     const viewedDocs = filteredDocuments.filter(
@@ -689,14 +702,6 @@ export default function Dashboard() {
         fileUrl: d.fileUrl || "",
       }));
 
-    let incomingDocsCount = 0;
-    let outgoingDocsCount = 0;
-    filteredDocuments.forEach((d) => {
-      const dir = String(d.direction || "").toLowerCase();
-      if (dir === "outgoing") outgoingDocsCount += 1;
-      else incomingDocsCount += 1;
-    });
-
     return {
       totalCount,
       pendingCount: pendingDocs.length,
@@ -709,8 +714,6 @@ export default function Dashboard() {
       pieData,
       recentActivity,
       allRefs,
-      incomingDocsCount,
-      outgoingDocsCount,
     };
   }, [filteredDocuments, effectiveBarYear]);
 
@@ -819,7 +822,6 @@ export default function Dashboard() {
             icon={<FileIcon />}
             label="Total Documents"
             value={summary.totalCount}
-            subline={`Incoming ${summary.incomingDocsCount} · Outgoing ${summary.outgoingDocsCount}`}
             onClick={handleTotalClick}
           />
         </div>

@@ -205,6 +205,16 @@ function EmojiPicker({ onSelect }) {
   );
 }
 
+function safeFileUrl(url) {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    return (u.protocol === "https:" || u.protocol === "http:") ? url : "";
+  } catch {
+    return "";
+  }
+}
+
 /* ─── Main Component ───────────────────────────────────────────────────────── */
 
 export default function Chat() {
@@ -294,10 +304,14 @@ export default function Chat() {
     if (!currentUid) return;
     const userRef = doc(db, "users", currentUid);
 
-    updateDoc(userRef, { online: true, lastSeen: serverTimestamp() }).catch(() => {});
+    updateDoc(userRef, { online: true, lastSeen: serverTimestamp() }).catch((err) => {
+      console.error("Presence update failed:", err);
+    });
 
     const markOffline = () =>
-      updateDoc(userRef, { online: false, lastSeen: Timestamp.now() }).catch(() => {});
+      updateDoc(userRef, { online: false, lastSeen: Timestamp.now() }).catch((err) => {
+        console.error("Presence offline failed:", err);
+      });
 
     window.addEventListener("beforeunload", markOffline);
     return () => {
@@ -465,6 +479,7 @@ export default function Chat() {
     setShowMenu(false);
     setEditMode(false);
     setEditingMsgId(null);
+    typingLastSentRef.current = 0;
   };
 
   const getOrCreateChat = async (otherUser) => {
@@ -812,9 +827,9 @@ export default function Chat() {
             <div className="wa-bubble-meta">
               <a
                 className={`wa-file-open-link ${isMine ? "mine" : ""}`}
-                href={msg.fileUrl || `/library?doc=${msg.docId}`}
-                target={msg.fileUrl ? "_blank" : "_self"}
-                rel="noreferrer"
+                href={safeFileUrl(msg.fileUrl) || `/library?doc=${msg.docId}`}
+                target={safeFileUrl(msg.fileUrl) ? "_blank" : "_self"}
+                rel="noreferrer noopener"
               >
                 Open
               </a>
