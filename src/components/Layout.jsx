@@ -633,7 +633,7 @@ export default function Layout({ children }) {
         </nav>
 
         <div className="sidebar-footer">
-          © 2026 Unit Teknologi Maklumat, IPK Perak
+          © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
         </div>
       </aside>
 
@@ -844,6 +844,9 @@ export default function Layout({ children }) {
         </header>
 
         <main className="page-content">{children}</main>
+        <footer className="main-footer">
+          © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
+        </footer>
       </div>
 
       {showLogoutConfirm && (

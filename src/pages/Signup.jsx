@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
-  signOut,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -152,8 +151,7 @@ export default function Signup() {
       });
       await batch.commit();
 
-      await signOut(auth);
-      navigate("/login", { replace: true, state: { registrationComplete: true } });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       try {
         if (createdUser) await deleteUser(createdUser);
@@ -266,7 +264,7 @@ export default function Signup() {
             </form>
 
             <footer className="login-footer">
-              © 2026 Unit Teknologi Maklumat, IPK Perak
+              © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
             </footer>
           </div>
         </div>
