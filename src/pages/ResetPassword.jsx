@@ -253,7 +253,7 @@ export default function ResetPassword() {
             {renderContent()}
 
             <footer className="login-footer">
-              © 2026 Unit Teknologi Maklumat, IPK Perak
+              © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
             </footer>
           </div>
         </div>
