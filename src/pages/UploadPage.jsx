@@ -12,6 +12,9 @@ import { useToast } from "../context/ToastContext";
 import Layout from "../components/Layout";
 import { db } from "../firebase";
 
+const MAX_FILE_SIZE_MB = 10;
+const UPLOAD_TIMEOUT_MS = 30_000;
+
 const DEPARTMENT_OPTIONS = ["ADMIN TSM", "IT", "SAIFER", "KOMUNIKASI"];
 
 const TYPE_OPTIONS = [
@@ -25,7 +28,6 @@ export default function UploadPage() {
   const [refNo, setRefNo] = useState("");
   const [title, setTitle] = useState("");
   const [type, setType] = useState("");
-  const [direction] = useState("incoming");
   const [pdfFile, setPdfFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -87,8 +89,8 @@ export default function UploadPage() {
       setError("Only PDF files are accepted.");
       return;
     }
-    if (pdfFile.size > 10 * 1024 * 1024) {
-      setError("File is too large. Maximum is 10 MB.");
+    if (pdfFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setError(`File is too large. Maximum is ${MAX_FILE_SIZE_MB} MB.`);
       return;
     }
 
@@ -117,10 +119,18 @@ export default function UploadPage() {
         reader.readAsDataURL(pdfFile);
       });
 
-      const response = await fetch(import.meta.env.VITE_APPS_SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({ base64Data, fileName: pdfFile.name, type: type.trim() }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+      let response;
+      try {
+        response = await fetch(import.meta.env.VITE_APPS_SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({ base64Data, fileName: pdfFile.name, type: type.trim() }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) throw new Error(`Upload failed (HTTP ${response.status})`);
 
@@ -134,7 +144,6 @@ export default function UploadPage() {
         refNo: trimmedRef,
         title: title.trim(),
         type: type.trim(),
-        direction,
         fileUrl: result.viewUrl,
         fileId: result.fileId,
         department: departments.join(", "),
@@ -147,7 +156,9 @@ export default function UploadPage() {
       toast("Document uploaded successfully.", "success");
     } catch (err) {
       console.error(err);
-      const msg = err.message || "Failed to upload document.";
+      const msg = err.name === "AbortError"
+        ? "Upload timed out. Please try again."
+        : err.message || "Failed to upload document.";
       setError(msg);
       toast(msg, "error");
     } finally {
@@ -354,7 +365,7 @@ export default function UploadPage() {
                         <p className="upv3-dropzone-main">
                           Drag &amp; drop your file here or <span className="upv3-dropzone-link">browse</span>
                         </p>
-                        <p className="upv3-dropzone-hint">PDF only — Max 10MB</p>
+                        <p className="upv3-dropzone-hint">PDF only — Max {MAX_FILE_SIZE_MB}MB</p>
                       </div>
                     )}
                   </div>

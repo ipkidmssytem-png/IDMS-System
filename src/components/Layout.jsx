@@ -501,19 +501,13 @@ export default function Layout({ children }) {
 
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
       const typeUpper = String(doc.type || "").toUpperCase();
-      const directionLower = String(doc.direction || "").toLowerCase();
       const statusLower = String(doc.status || "pending").toLowerCase();
 
-      if (
-        typeUpper === "MEMO" &&
-        directionLower === "incoming" &&
-        createdMs &&
-        now - createdMs <= sevenDays
-      ) {
+      if (typeUpper === "MEMO" && createdMs && now - createdMs <= sevenDays) {
         list.push({
           id: `${doc.id}_urgent`,
           type: "urgent",
-          title: "Urgent: incoming MEMO",
+          title: "Urgent: MEMO (new)",
           subtitle: doc.title ? `${ref} — ${doc.title}` : ref,
           time: createdMs,
           docId: doc.id,

@@ -86,7 +86,6 @@ export default function Signup() {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [formError, setFormError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleBlur = (name, value) => {
@@ -108,7 +107,6 @@ export default function Signup() {
   const handleSignup = async (e) => {
     e.preventDefault();
     setFormError("");
-    setSuccess("");
 
     const allTouched = { username: true, email: true, password: true, confirmPassword: true };
     setTouched(allTouched);
@@ -124,7 +122,7 @@ export default function Signup() {
     if (Object.values(newErrors).some(Boolean)) return;
 
     const cleanUsername = username.trim();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     let createdUser = null;
 
     try {
@@ -150,12 +148,12 @@ export default function Signup() {
       });
       batch.set(doc(db, "usernames", usernameKey), {
         uid: createdUser.uid,
+        email: cleanEmail,
       });
       await batch.commit();
 
-      setSuccess("Account created! Redirecting to login...");
       await signOut(auth);
-      setTimeout(() => navigate("/login"), 1500);
+      navigate("/login", { replace: true, state: { registrationComplete: true } });
     } catch (err) {
       try {
         if (createdUser) await deleteUser(createdUser);
@@ -256,9 +254,8 @@ export default function Signup() {
               </div>
 
               {formError && <p className="login-error-msg">{formError}</p>}
-              {success && <p className="signup-success-msg">&#10003; {success}</p>}
 
-              <button type="submit" className="login-btn" disabled={loading || !!success}>
+              <button type="submit" className="login-btn" disabled={loading}>
                 {loading ? "Creating Account..." : "Create Account"}
               </button>
 

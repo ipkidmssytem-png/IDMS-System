@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   orderBy,
   query,
@@ -315,11 +316,6 @@ function EditDocModal({ item, onClose, onToast }) {
   const [refNo, setRefNo] = useState(item.refNo || "");
   const [title, setTitle] = useState(item.title || "");
   const [type, setType] = useState(String(item.type || "MEMO").toUpperCase());
-  const [direction, setDirection] = useState(
-    String(item.direction || "incoming").toLowerCase() === "outgoing"
-      ? "outgoing"
-      : "incoming"
-  );
   const [departments, setDepartments] = useState(() => {
     if (Array.isArray(item.departments) && item.departments.length > 0) {
       return item.departments;
@@ -353,7 +349,7 @@ function EditDocModal({ item, onClose, onToast }) {
         refNo: r,
         title: t,
         type: type.trim(),
-        direction,
+        direction: deleteField(),
         departments,
         department: departments.join(", "),
       });
@@ -394,26 +390,6 @@ function EditDocModal({ item, onClose, onToast }) {
         </div>
 
         <div className="lib-edit-field">
-          <span id="lib-edit-dir-label">Direction</span>
-          <div className="lib-edit-toggle-row" role="group" aria-labelledby="lib-edit-dir-label">
-            <button
-              type="button"
-              className={`lib-edit-toggle-btn${direction === "incoming" ? " active" : ""}`}
-              onClick={() => setDirection("incoming")}
-            >
-              Incoming
-            </button>
-            <button
-              type="button"
-              className={`lib-edit-toggle-btn${direction === "outgoing" ? " active" : ""}`}
-              onClick={() => setDirection("outgoing")}
-            >
-              Outgoing
-            </button>
-          </div>
-        </div>
-
-        <div className="lib-edit-field">
           <span>Departments</span>
           <div className="lib-edit-dept-grid">
             {LIBRARY_EDIT_DEPTS.map((dept) => (
@@ -446,10 +422,10 @@ export default function Library() {
   const { toast } = useToast();
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("latest");
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
@@ -460,26 +436,50 @@ export default function Library() {
   const [syncing, setSyncing] = useState(false);
   const [emailModal, setEmailModal] = useState(null);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = String(searchParams.get("status") || "all").toLowerCase();
 
   useEffect(() => {
     const q = query(collection(db, "documents"), orderBy("createdAt", "desc"));
 
-    const unsub = onSnapshot(q, (snap) => {
-      setDocuments(
-        snap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }))
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setDocuments(
+          snap.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }))
+        );
+      },
+      (err) => {
+        console.error("Library documents subscription failed:", err);
+      }
+    );
 
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    setPage(1);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const setPage = (pg) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", String(pg));
+      return next;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", "1");
+      return next;
+    }, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, typeFilter, deptFilter, statusFilter, sortBy, sortColumn, sortDirection, pageSize, dateFrom, dateTo]);
 
   const statusFilteredDocs = useMemo(() => {
@@ -547,7 +547,7 @@ export default function Library() {
       });
     }
 
-    const keyword = search.trim().toLowerCase();
+    const keyword = debouncedSearch.trim().toLowerCase();
     if (keyword) {
       result = result.filter(
         (item) =>
@@ -615,10 +615,11 @@ export default function Library() {
     }
 
     return result;
-  }, [statusFilteredDocs, search, typeFilter, deptFilter, sortColumn, sortDirection, sortBy, dateFrom, dateTo]);
+  }, [statusFilteredDocs, debouncedSearch, typeFilter, deptFilter, sortColumn, sortDirection, sortBy, dateFrom, dateTo]);
 
+  const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
   const totalPages = Math.max(1, Math.ceil(processedDocs.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(urlPage, totalPages);
   const startIdx = (currentPage - 1) * pageSize;
   const endIdx = Math.min(startIdx + pageSize, processedDocs.length);
   const paginatedDocs = processedDocs.slice(startIdx, endIdx);
@@ -1019,9 +1020,9 @@ export default function Library() {
                         <td className="library-v2-dept-cell">
                           {deptNames.length > 0 ? (
                             <div className="library-v2-dept-pills">
-                              {deptNames.map((name, i) => (
+                              {deptNames.map((name) => (
                                 <span
-                                  key={`${docItem.id}-${name}-${i}`}
+                                  key={`${docItem.id}-${name}`}
                                   className="library-v2-dept-pill"
                                   title={name}
                                 >
@@ -1088,7 +1089,7 @@ export default function Library() {
                                 className="library-v2-icon-btn"
                                 href={
                                   docItem.fileId
-                                    ? `https://drive.google.com/uc?export=download&id=${docItem.fileId}`
+                                    ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(docItem.fileId)}`
                                     : docItem.fileUrl
                                 }
                                 target="_blank"

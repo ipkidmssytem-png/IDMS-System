@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import "./auth.css";
 
@@ -42,10 +42,16 @@ function GoogleIcon() {
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+const USERNAME_CHARS = /^[a-zA-Z0-9_]+$/;
+
 const validateField = (name, value) => {
   if (name === "username") {
-    if (!value.trim()) return "Username or email is required";
-    if (!isEmail(value) && value.trim().length < 3) return "Minimum 3 characters";
+    const t = value.trim();
+    if (!t) return "Username or email is required";
+    if (!isEmail(value)) {
+      if (t.length < 3) return "Minimum 3 characters";
+      if (!USERNAME_CHARS.test(t)) return "Username: letters, numbers, and underscores only";
+    }
   }
   if (name === "password") {
     if (!value) return "Password is required";
@@ -55,6 +61,7 @@ const validateField = (name, value) => {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -64,6 +71,14 @@ export default function Login() {
   const [loginError, setLoginError] = useState("");
   const [googleError, setGoogleError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registrationNotice, setRegistrationNotice] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.registrationComplete) {
+      setRegistrationNotice(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const handleBlur = (name, value) => {
     setTouched((prev) => ({ ...prev, [name]: true }));
@@ -85,20 +100,26 @@ export default function Login() {
     try {
       setLoading(true);
 
-      let emailToUse = username.trim();
+      const trimmed = username.trim();
+      let emailToUse = trimmed;
 
-      if (!isEmail(emailToUse)) {
-        const q = query(
-          collection(db, "users"),
-          where("username", "==", emailToUse),
-          limit(1)
-        );
-        const result = await getDocs(q);
-        if (result.empty) {
+      if (!isEmail(trimmed)) {
+        const key = trimmed.toLowerCase();
+        const claimSnap = await getDoc(doc(db, "usernames", key));
+        if (!claimSnap.exists()) {
           setLoginError("Invalid username or password.");
           return;
         }
-        emailToUse = result.docs[0].data().email;
+        const claim = claimSnap.data();
+        emailToUse = claim.email || "";
+        if (!emailToUse) {
+          setLoginError(
+            "This account was created before username login was updated. Please sign in with your email address."
+          );
+          return;
+        }
+      } else {
+        emailToUse = trimmed.toLowerCase();
       }
 
       await signInWithEmailAndPassword(auth, emailToUse, password);
@@ -157,6 +178,12 @@ export default function Login() {
             <p className="idms-unit">POLIS DIRAJA MALAYSIA &middot; IPK PERAK</p>
 
             <div className="login-divider-gold"></div>
+
+            {registrationNotice && (
+              <p className="signup-success-msg" role="status">
+                &#10003; Account created. Please sign in with your username or email and password.
+              </p>
+            )}
 
             <form onSubmit={handleLogin} className="login-form" noValidate>
 
