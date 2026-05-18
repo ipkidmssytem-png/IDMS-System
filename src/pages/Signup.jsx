@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  updateProfile,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -38,22 +39,28 @@ function EyeSlashIcon() {
 
 const validateField = (name, value, extra = {}) => {
   switch (name) {
-    case "username":
-      if (!value.trim()) return "Username is required";
-      if (value.trim().length < 3) return "Minimum 3 characters";
-      if (!/^[a-zA-Z0-9_]+$/.test(value.trim())) return "Only letters, numbers and underscores";
+    case "nomborBadan":
+      if (!value.trim()) return "Nombor Badan diperlukan";
+      if (value.trim().length < 3) return "Minimum 3 aksara";
+      if (!/^[a-zA-Z0-9]+$/.test(value.trim())) return "Nombor Badan hanya boleh mengandungi huruf dan nombor";
+      return "";
+    case "firstName":
+      if (!value.trim()) return "Nama pertama diperlukan";
+      return "";
+    case "lastName":
+      if (!value.trim()) return "Nama akhir diperlukan";
       return "";
     case "email":
-      if (!value.trim()) return "Email is required";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Enter a valid email address";
+      if (!value.trim()) return "Email diperlukan";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Masukkan alamat email yang sah";
       return "";
     case "password":
-      if (!value) return "Password is required";
+      if (!value) return "Kata laluan diperlukan";
       if (!isPasswordStrong(value)) return PASSWORD_REQUIREMENT_TEXT;
       return "";
     case "confirmPassword":
-      if (!value) return "Please confirm your password";
-      if (value !== extra.password) return "Passwords do not match";
+      if (!value) return "Sila sahkan kata laluan anda";
+      if (value !== extra.password) return "Kata laluan tidak sepadan";
       return "";
     default:
       return "";
@@ -62,21 +69,21 @@ const validateField = (name, value, extra = {}) => {
 
 const firebaseErrorMessage = (code) => {
   switch (code) {
-    case "auth/email-already-in-use": return "This email is already registered.";
-    case "auth/invalid-email":        return "Please enter a valid email address.";
+    case "auth/email-already-in-use": return "Email ini sudah didaftarkan.";
+    case "auth/invalid-email":        return "Sila masukkan alamat email yang sah.";
     case "auth/weak-password":        return PASSWORD_REQUIREMENT_TEXT;
-    case "auth/network-request-failed": return "Network error. Check your connection and try again.";
-    case "auth/too-many-requests":    return "Too many attempts. Please try again later.";
-    case "permission-denied":
-      return "Could not verify username or save your profile (Firestore rules). If this persists after deploy, contact your administrator.";
-    default:                          return "Failed to create account. Please try again.";
+    case "auth/network-request-failed": return "Ralat rangkaian. Semak sambungan anda dan cuba lagi.";
+    case "auth/too-many-requests":    return "Terlalu banyak percubaan. Sila cuba lagi kemudian.";
+    default:                          return "Gagal mencipta akaun. Sila cuba lagi.";
   }
 };
 
 export default function Signup() {
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
+  const [nomborBadan, setNomborBadan] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -107,11 +114,16 @@ export default function Signup() {
     e.preventDefault();
     setFormError("");
 
-    const allTouched = { username: true, email: true, password: true, confirmPassword: true };
+    const allTouched = {
+      nomborBadan: true, firstName: true, lastName: true,
+      email: true, password: true, confirmPassword: true,
+    };
     setTouched(allTouched);
 
     const newErrors = {
-      username:        validateField("username", username),
+      nomborBadan:     validateField("nomborBadan", nomborBadan),
+      firstName:       validateField("firstName", firstName),
+      lastName:        validateField("lastName", lastName),
       email:           validateField("email", email),
       password:        validateField("password", password),
       confirmPassword: validateField("confirmPassword", confirmPassword, { password }),
@@ -120,33 +132,41 @@ export default function Signup() {
 
     if (Object.values(newErrors).some(Boolean)) return;
 
-    const cleanUsername = username.trim();
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanNomborBadan = nomborBadan.trim();
+    const cleanFirstName   = firstName.trim();
+    const cleanLastName    = lastName.trim();
+    const cleanEmail       = email.trim().toLowerCase();
+    const fullName         = `${cleanFirstName} ${cleanLastName}`;
     let createdUser = null;
 
     try {
       setLoading(true);
 
-      const usernameKey = cleanUsername.toLowerCase();
-      const usernameClaim = await getDoc(doc(db, "usernames", usernameKey));
+      const nomborBadanKey = cleanNomborBadan.toLowerCase();
+      const nomborBadanClaim = await getDoc(doc(db, "usernames", nomborBadanKey));
 
-      if (usernameClaim.exists()) {
-        setErrors((prev) => ({ ...prev, username: "Username already taken" }));
+      if (nomborBadanClaim.exists()) {
+        setErrors((prev) => ({ ...prev, nomborBadan: "Nombor Badan ini telah didaftarkan" }));
         return;
       }
 
       const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       createdUser = credential.user;
+
+      await updateProfile(createdUser, { displayName: fullName });
       await createdUser.getIdToken(true);
 
       const batch = writeBatch(db);
       batch.set(doc(db, "users", createdUser.uid), {
-        username: cleanUsername,
-        email: cleanEmail,
+        username:  cleanNomborBadan,
+        firstName: cleanFirstName,
+        lastName:  cleanLastName,
+        email:     cleanEmail,
+        role:      "user",
         createdAt: serverTimestamp(),
       });
-      batch.set(doc(db, "usernames", usernameKey), {
-        uid: createdUser.uid,
+      batch.set(doc(db, "usernames", nomborBadanKey), {
+        uid:   createdUser.uid,
         email: cleanEmail,
       });
       await batch.commit();
@@ -176,28 +196,60 @@ export default function Signup() {
 
             <div className="login-divider-gold"></div>
 
-            <p className="signup-heading">Create an Account</p>
+            <p className="signup-heading">Daftar Akaun</p>
 
             <form onSubmit={handleSignup} className="login-form" noValidate>
 
               <div className="form-group">
-                <label>Username</label>
+                <label>Nombor Badan</label>
                 <input
                   type="text"
-                  value={username}
-                  onChange={(e) => { setUsername(e.target.value); revalidate("username", e.target.value); }}
-                  onBlur={() => handleBlur("username", username)}
+                  value={nomborBadan}
+                  autoComplete="username"
+                  onChange={(e) => { setNomborBadan(e.target.value); revalidate("nomborBadan", e.target.value); }}
+                  onBlur={() => handleBlur("nomborBadan", nomborBadan)}
                 />
-                {touched.username && errors.username && (
-                  <span className="field-error">{errors.username}</span>
+                {touched.nomborBadan && errors.nomborBadan && (
+                  <span className="field-error">{errors.nomborBadan}</span>
                 )}
               </div>
 
+              <div style={{ display: "flex", gap: 10 }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Nama Pertama</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    autoComplete="given-name"
+                    onChange={(e) => { setFirstName(e.target.value); revalidate("firstName", e.target.value); }}
+                    onBlur={() => handleBlur("firstName", firstName)}
+                  />
+                  {touched.firstName && errors.firstName && (
+                    <span className="field-error">{errors.firstName}</span>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Nama Akhir</label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    autoComplete="family-name"
+                    onChange={(e) => { setLastName(e.target.value); revalidate("lastName", e.target.value); }}
+                    onBlur={() => handleBlur("lastName", lastName)}
+                  />
+                  {touched.lastName && errors.lastName && (
+                    <span className="field-error">{errors.lastName}</span>
+                  )}
+                </div>
+              </div>
+
               <div className="form-group">
-                <label>Email</label>
+                <label>Email <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(untuk pemulihan kata laluan)</span></label>
                 <input
                   type="email"
                   value={email}
+                  autoComplete="email"
                   onChange={(e) => { setEmail(e.target.value); revalidate("email", e.target.value); }}
                   onBlur={() => handleBlur("email", email)}
                 />
@@ -207,11 +259,12 @@ export default function Signup() {
               </div>
 
               <div className="form-group">
-                <label>Password</label>
+                <label>Kata Laluan</label>
                 <div className="password-field">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
+                    autoComplete="new-password"
                     onChange={(e) => {
                       setPassword(e.target.value);
                       revalidate("password", e.target.value);
@@ -234,11 +287,12 @@ export default function Signup() {
               </div>
 
               <div className="form-group">
-                <label>Confirm Password</label>
+                <label>Sahkan Kata Laluan</label>
                 <div className="password-field">
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
+                    autoComplete="new-password"
                     onChange={(e) => { setConfirmPassword(e.target.value); revalidate("confirmPassword", e.target.value); }}
                     onBlur={() => handleBlur("confirmPassword", confirmPassword)}
                   />
@@ -254,11 +308,11 @@ export default function Signup() {
               {formError && <p className="login-error-msg">{formError}</p>}
 
               <button type="submit" className="login-btn" disabled={loading}>
-                {loading ? "Creating Account..." : "Create Account"}
+                {loading ? "Mencipta Akaun..." : "Daftar"}
               </button>
 
               <button type="button" className="signup-btn" onClick={() => navigate("/login")}>
-                Back to Login
+                Kembali ke Log Masuk
               </button>
 
             </form>

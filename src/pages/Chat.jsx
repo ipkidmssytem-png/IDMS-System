@@ -83,6 +83,14 @@ function getInitial(name) {
   return name.charAt(0).toUpperCase();
 }
 
+function resolveUserDisplayName(user) {
+  if (!user) return "Unknown";
+  const first = (user.firstName || "").trim();
+  const last  = (user.lastName  || "").trim();
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+  return user.username || "Unknown";
+}
+
 /* ─── Emoji List ───────────────────────────────────────────────────────────── */
 
 const EMOJI_LIST = [
@@ -246,6 +254,7 @@ export default function Chat() {
   const [editingText, setEditingText] = useState("");
 
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [msgMenuId, setMsgMenuId] = useState(null);
   const [sendError, setSendError] = useState("");
   const [newConvError, setNewConvError] = useState("");
   const [tickNowMs, setTickNowMs] = useState(() => Date.now());
@@ -258,7 +267,7 @@ export default function Chat() {
     if (!name && currentUid) {
       const meSnap = await getDoc(doc(db, "users", currentUid));
       if (meSnap.exists()) {
-        name = String(meSnap.data().username || "").trim();
+        name = resolveUserDisplayName(meSnap.data());
         if (name) setCurrentUsername(name);
       }
     }
@@ -284,7 +293,7 @@ export default function Chat() {
   useEffect(() => {
     if (!currentUid) return;
     getDoc(doc(db, "users", currentUid)).then((snap) => {
-      if (snap.exists()) setCurrentUsername(snap.data().username || "");
+      if (snap.exists()) setCurrentUsername(resolveUserDisplayName(snap.data()));
     });
   }, [currentUid]);
 
@@ -388,6 +397,10 @@ export default function Chat() {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setShowMenu(false);
       }
+
+      if (!e.target.closest(".wa-msg-menu-wrap")) {
+        setMsgMenuId(null);
+      }
     };
 
     document.addEventListener("mousedown", handler);
@@ -454,6 +467,12 @@ export default function Chat() {
             deleted: true,
             deletedAt: serverTimestamp(),
           });
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg?.id === msg.id) {
+            await updateDoc(doc(db, "chats", selectedChatId), {
+              lastMessage: "This message was deleted",
+            });
+          }
         } catch (e) {
           console.error("Delete message failed:", e);
         }
@@ -489,10 +508,7 @@ export default function Chat() {
 
     if (!existing.exists()) {
       const senderName = await resolveSenderUsername();
-      const otherName =
-        String(otherUser.username || "").trim() ||
-        otherUser.email?.split("@")[0]?.trim() ||
-        "";
+      const otherName = resolveUserDisplayName(otherUser) || otherUser.email?.split("@")[0]?.trim() || "";
 
       await setDoc(chatRef, {
         participants: [currentUid, otherUser.id],
@@ -714,6 +730,7 @@ export default function Chat() {
     if (!newConvSearch.trim()) return allUsers;
     const q = newConvSearch.toLowerCase();
     return allUsers.filter((u) =>
+      resolveUserDisplayName(u).toLowerCase().includes(q) ||
       (u.username || "").toLowerCase().includes(q)
     );
   }, [allUsers, newConvSearch]);
@@ -783,10 +800,8 @@ export default function Chat() {
     if (msg.deleted) {
       return (
         <div key={msg.id} className={`wa-bubble-wrap ${isMine ? "mine" : "theirs"}`}>
-          <div
-            className={`wa-bubble ${isMine ? "wa-bubble-mine" : "wa-bubble-theirs"} wa-bubble-file`}
-          >
-            <span className="wa-bubble-deleted">This message was deleted</span>
+          <div className="wa-bubble wa-bubble-deleted-wrap">
+            <span className="wa-bubble-deleted">🚫 This message was deleted</span>
             <div className="wa-bubble-meta">
               <span className="wa-bubble-time">{formatTime(ms)}</span>
             </div>
@@ -798,17 +813,31 @@ export default function Chat() {
     if (msg.type === "library_doc") {
       return (
         <div key={msg.id} className={`wa-bubble-wrap ${isMine ? "mine" : "theirs"}`}>
-          <div className={`wa-bubble ${isMine ? "wa-bubble-mine" : "wa-bubble-theirs"} wa-bubble-file`}>
-            {isMine && (
+          {isMine && (
+            <div className="wa-msg-menu-wrap">
               <button
                 type="button"
-                className="wa-bubble-delete-btn"
-                title="Delete"
-                onClick={() => confirmDeleteMsg(msg)}
+                className="wa-msg-dots-btn"
+                title="More options"
+                onClick={(e) => { e.stopPropagation(); setMsgMenuId(msgMenuId === msg.id ? null : msg.id); }}
               >
-                Delete
+                <Icon.More />
               </button>
-            )}
+              {msgMenuId === msg.id && (
+                <div className="wa-msg-dropdown">
+                  <button
+                    type="button"
+                    className="wa-msg-dropdown-item danger"
+                    onClick={() => { setMsgMenuId(null); confirmDeleteMsg(msg); }}
+                  >
+                    <Icon.Trash />
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <div className={`wa-bubble ${isMine ? "wa-bubble-mine" : "wa-bubble-theirs"} wa-bubble-file`}>
             <div className="wa-file-content">
               <div className={`wa-file-icon-wrap ${isMine ? "mine" : ""}`}>
                 <Icon.Doc />
@@ -847,17 +876,31 @@ export default function Chat() {
 
     return (
         <div key={msg.id} className={`wa-bubble-wrap ${isMine ? "mine" : "theirs"}`}>
-        <div className={`wa-bubble ${isMine ? "wa-bubble-mine" : "wa-bubble-theirs"} ${canEdit ? "editable" : ""}`}>
-          {isMine && (
+        {isMine && !msg.deleted && (
+          <div className="wa-msg-menu-wrap">
             <button
               type="button"
-              className="wa-bubble-delete-btn"
-              title="Delete"
-              onClick={() => confirmDeleteMsg(msg)}
+              className="wa-msg-dots-btn"
+              title="More options"
+              onClick={(e) => { e.stopPropagation(); setMsgMenuId(msgMenuId === msg.id ? null : msg.id); }}
             >
-              Delete
+              <Icon.More />
             </button>
-          )}
+            {msgMenuId === msg.id && (
+              <div className="wa-msg-dropdown">
+                <button
+                  type="button"
+                  className="wa-msg-dropdown-item danger"
+                  onClick={() => { setMsgMenuId(null); confirmDeleteMsg(msg); }}
+                >
+                  <Icon.Trash />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className={`wa-bubble ${isMine ? "wa-bubble-mine" : "wa-bubble-theirs"} ${canEdit ? "editable" : ""}`}>
           {isEditingThis ? (
             <div className="wa-msg-edit-wrap">
               <textarea
@@ -1315,10 +1358,10 @@ export default function Chat() {
                     onClick={() => startNewConversation(u)}
                     type="button"
                   >
-                    <div className="wa-modal-user-avatar">{getInitial(u.username)}</div>
+                    <div className="wa-modal-user-avatar">{getInitial(resolveUserDisplayName(u))}</div>
                     <div className="wa-modal-user-info">
-                      <div className="wa-modal-user-name">{u.username}</div>
-                      {u.email && <div className="wa-modal-user-email">{u.email}</div>}
+                      <div className="wa-modal-user-name">{resolveUserDisplayName(u)}</div>
+                      <div className="wa-modal-user-email">{u.username}</div>
                     </div>
                     <div className="wa-modal-user-arrow">→</div>
                   </button>

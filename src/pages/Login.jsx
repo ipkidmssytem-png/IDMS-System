@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import "./auth.css";
 
@@ -29,32 +29,15 @@ function EyeSlashIcon() {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-    </svg>
-  );
-}
-
-const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-
-const USERNAME_CHARS = /^[a-zA-Z0-9_]+$/;
-
 const validateField = (name, value) => {
-  if (name === "username") {
+  if (name === "nomborBadan") {
     const t = value.trim();
-    if (!t) return "Username or email is required";
-    if (!isEmail(value)) {
-      if (t.length < 3) return "Minimum 3 characters";
-      if (!USERNAME_CHARS.test(t)) return "Username: letters, numbers, and underscores only";
-    }
+    if (!t) return "Nombor Badan diperlukan";
+    if (t.length < 3) return "Minimum 3 aksara";
+    if (!/^[a-zA-Z0-9]+$/.test(t)) return "Nombor Badan hanya boleh mengandungi huruf dan nombor";
   }
   if (name === "password") {
-    if (!value) return "Password is required";
+    if (!value) return "Kata laluan diperlukan";
   }
   return "";
 };
@@ -63,13 +46,12 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [username, setUsername] = useState("");
+  const [nomborBadan, setNomborBadan] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [loginError, setLoginError] = useState("");
-  const [googleError, setGoogleError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registrationNotice, setRegistrationNotice] = useState(false);
 
@@ -88,80 +70,35 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
-    setGoogleError("");
 
-    const usernameErr = validateField("username", username);
+    const nomborBadanErr = validateField("nomborBadan", nomborBadan);
     const passwordErr = validateField("password", password);
-    setErrors({ username: usernameErr, password: passwordErr });
-    setTouched({ username: true, password: true });
+    setErrors({ nomborBadan: nomborBadanErr, password: passwordErr });
+    setTouched({ nomborBadan: true, password: true });
 
-    if (usernameErr || passwordErr) return;
+    if (nomborBadanErr || passwordErr) return;
 
     try {
       setLoading(true);
 
-      const trimmed = username.trim();
-      let emailToUse = trimmed;
+      const key = nomborBadan.trim().toLowerCase();
+      const claimSnap = await getDoc(doc(db, "usernames", key));
 
-      if (!isEmail(trimmed)) {
-        const key = trimmed.toLowerCase();
-        const claimSnap = await getDoc(doc(db, "usernames", key));
-        if (!claimSnap.exists()) {
-          setLoginError("Invalid username or password.");
-          return;
-        }
-        const claim = claimSnap.data();
-        emailToUse = claim.email || "";
-        if (!emailToUse) {
-          setLoginError(
-            "This account was created before username login was updated. Please sign in with your email address."
-          );
-          return;
-        }
-      } else {
-        emailToUse = trimmed.toLowerCase();
+      if (!claimSnap.exists()) {
+        setLoginError("Nombor Badan atau kata laluan tidak sah.");
+        return;
+      }
+
+      const emailToUse = claimSnap.data().email || "";
+      if (!emailToUse) {
+        setLoginError("Akaun tidak dijumpai. Sila hubungi pentadbir anda.");
+        return;
       }
 
       await signInWithEmailAndPassword(auth, emailToUse, password);
       navigate("/dashboard");
     } catch {
-      setLoginError("Invalid username or password.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setLoginError("");
-    setGoogleError("");
-    try {
-      setLoading(true);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          username: user.displayName || user.email.split("@")[0],
-          email: user.email,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      navigate("/dashboard");
-    } catch (err) {
-      if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
-        return;
-      }
-      if (err.code === "auth/popup-blocked") {
-        setGoogleError("Pop-up was blocked by the browser. Please allow pop-ups and try again.");
-      } else if (err.code === "auth/network-request-failed") {
-        setGoogleError("Network error. Check your connection and try again.");
-      } else {
-        setGoogleError("Google sign-in failed. Please try again.");
-      }
+      setLoginError("Nombor Badan atau kata laluan tidak sah.");
     } finally {
       setLoading(false);
     }
@@ -181,40 +118,48 @@ export default function Login() {
 
             {registrationNotice && (
               <p className="signup-success-msg" role="status">
-                &#10003; Account created. Please sign in with your username or email and password.
+                &#10003; Akaun berjaya dicipta. Sila log masuk dengan Nombor Badan dan kata laluan anda.
               </p>
             )}
 
             <form onSubmit={handleLogin} className="login-form" noValidate>
 
               <div className="form-group">
-                <label>Username or Email</label>
+                <label>Nombor Badan</label>
                 <input
                   type="text"
-                  value={username}
+                  value={nomborBadan}
+                  autoComplete="username"
                   onChange={(e) => {
-                    setUsername(e.target.value);
-                    if (touched.username) {
-                      setErrors((prev) => ({ ...prev, username: validateField("username", e.target.value) }));
+                    setNomborBadan(e.target.value);
+                    if (touched.nomborBadan) {
+                      setErrors((prev) => ({
+                        ...prev,
+                        nomborBadan: validateField("nomborBadan", e.target.value),
+                      }));
                     }
                   }}
-                  onBlur={() => handleBlur("username", username)}
+                  onBlur={() => handleBlur("nomborBadan", nomborBadan)}
                 />
-                {touched.username && errors.username && (
-                  <span className="field-error">{errors.username}</span>
+                {touched.nomborBadan && errors.nomborBadan && (
+                  <span className="field-error">{errors.nomborBadan}</span>
                 )}
               </div>
 
               <div className="form-group">
-                <label>Password</label>
+                <label>Kata Laluan</label>
                 <div className="password-field">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
+                    autoComplete="current-password"
                     onChange={(e) => {
                       setPassword(e.target.value);
                       if (touched.password) {
-                        setErrors((prev) => ({ ...prev, password: validateField("password", e.target.value) }));
+                        setErrors((prev) => ({
+                          ...prev,
+                          password: validateField("password", e.target.value),
+                        }));
                       }
                     }}
                     onBlur={() => handleBlur("password", password)}
@@ -239,7 +184,7 @@ export default function Login() {
                   className="text-link"
                   onClick={() => navigate("/forgot-password")}
                 >
-                  Forgot Password?
+                  Lupa Kata Laluan?
                 </button>
               </div>
 
@@ -248,33 +193,15 @@ export default function Login() {
               )}
 
               <button type="submit" className="login-btn" disabled={loading}>
-                {loading ? "Logging In..." : "Log In"}
+                {loading ? "Log Masuk..." : "Log Masuk"}
               </button>
-
-              <div className="login-divider-or">
-                <span>or</span>
-              </div>
-
-              <button
-                type="button"
-                className="google-btn"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <GoogleIcon />
-                Sign in with Google
-              </button>
-
-              {googleError && (
-                <p className="login-error-msg google-error-msg">&#9432; {googleError}</p>
-              )}
 
               <button
                 type="button"
                 className="signup-btn"
                 onClick={() => navigate("/signup")}
               >
-                Sign Up
+                Daftar Akaun
               </button>
 
             </form>
