@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -11,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/UploadPage";
 import Library from "./pages/Library";
 import Chat from "./pages/Chat";
+import AdminPanel from "./pages/AdminPanel";
 
 // Redirects already-logged-in users away from auth pages
 function PublicRoute({ children }) {
@@ -83,6 +85,17 @@ function App() {
           element={
             <ProtectedRoute>
               <Chat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <AdminPanel />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />

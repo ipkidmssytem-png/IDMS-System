@@ -3,6 +3,8 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { db } from "../firebase";
+import { useRole } from "../hooks/useRole";
+import ReportModal from "./ReportModal";
 
 const MONTHS = [
   "Jan",
@@ -525,6 +527,8 @@ export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showReport, setShowReport] = useState(false);
+  const { isAdmin } = useRole();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -782,16 +786,40 @@ export default function Dashboard() {
       <div className="dashboard-screen dashboard-fixed-layout">
         <div className="dashboard-top-row">
           <h1 className="dashboard-main-title">Dashboard</h1>
-          <div className="dashboard-search-wrap">
-            <input
-              className="dashboard-search-input"
-              placeholder="Search data"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <span className="dashboard-search-icon">
-              <SearchIcon />
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowReport(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  padding: "8px 16px", borderRadius: 8,
+                  background: "#1e3a8a", color: "#fff",
+                  border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 1px 4px rgba(30,58,138,0.25)",
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M8 13H16M8 17H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Generate Report
+              </button>
+            )}
+            <div className="dashboard-search-wrap">
+              <input
+                className="dashboard-search-input"
+                placeholder="Search data"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <span className="dashboard-search-icon">
+                <SearchIcon />
+              </span>
+            </div>
           </div>
         </div>
 
@@ -955,6 +983,13 @@ export default function Dashboard() {
           icon={modalData.icon}
           items={modalData.items}
           onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {showReport && (
+        <ReportModal
+          documents={documents}
+          onClose={() => setShowReport(false)}
         />
       )}
     </Layout>

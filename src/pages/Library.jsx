@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
 import Layout from "../components/Layout";
 import { auth, db } from "../firebase";
+import { useRole } from "../hooks/useRole";
 
 const DEPARTMENT_FILTERS = ["All", "ADMIN TSM", "IT", "SAIFER", "KOMUNIKASI"];
 const LIBRARY_EDIT_TYPES = ["MEMO", "SURAT", "UTUSAN", "EMAIL"];
@@ -420,6 +421,7 @@ function EditDocModal({ item, onClose, onToast }) {
 
 export default function Library() {
   const { toast } = useToast();
+  const { isAdmin } = useRole();
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1100,15 +1102,17 @@ export default function Library() {
                               </a>
                             )}
 
-                            <button
-                              type="button"
-                              className="library-v2-icon-btn edit"
-                              onClick={() => setEditTarget(docItem)}
-                              aria-label="Edit document"
-                              title="Edit"
-                            >
-                              <PencilDocIcon />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                className="library-v2-icon-btn edit"
+                                onClick={() => setEditTarget(docItem)}
+                                aria-label="Edit document"
+                                title="Edit"
+                              >
+                                <PencilDocIcon />
+                              </button>
+                            )}
 
                             {statusText !== "Processed" && (
                               <button
@@ -1122,22 +1126,24 @@ export default function Library() {
                               </button>
                             )}
 
-                            <button
-                              type="button"
-                              className="library-v2-icon-btn library-v2-delete-btn"
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    "Are you sure you want to delete this document?"
-                                  )
-                                ) {
-                                  deleteDocument(docItem.id);
-                                }
-                              }}
-                              aria-label="Delete"
-                            >
-                              <TrashIcon />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                className="library-v2-icon-btn library-v2-delete-btn"
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      "Are you sure you want to delete this document?"
+                                    )
+                                  ) {
+                                    deleteDocument(docItem.id);
+                                  }
+                                }}
+                                aria-label="Delete"
+                              >
+                                <TrashIcon />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

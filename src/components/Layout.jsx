@@ -10,6 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { useRole } from "../hooks/useRole";
 import "../pages/app.css";
 
 /* ==============================
@@ -250,6 +251,26 @@ function ChatNavIcon() {
   );
 }
 
+function AdminNavIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3L4 7V12C4 16.4 7.4 20.5 12 21C16.6 20.5 20 16.4 20 12V7L12 3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 12L11 14L15 10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /* ==============================
    HELPERS
 ============================== */
@@ -354,6 +375,8 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isChatPage = location.pathname === "/chat";
+
+  const { isAdmin } = useRole();
 
   const links = useMemo(
     () => [
@@ -630,6 +653,17 @@ export default function Layout({ children }) {
               <span className="nav-link-text">{link.label}</span>
             </NavLink>
           ))}
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+            >
+              <span className="nav-link-icon"><AdminNavIcon /></span>
+              <span className="nav-link-text">Admin</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-footer">
