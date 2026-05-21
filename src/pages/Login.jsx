@@ -207,7 +207,7 @@ export default function Login() {
             </form>
 
             <footer className="login-footer">
-              © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
+              © {new Date().getFullYear()} Unit Telekomunikasi dan Sistem Maklumat, IPK Perak
             </footer>
           </div>
         </div>
