@@ -3,16 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAdmin() {
-      return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function isAdminOrAbove() {
+      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return request.auth != null && (role == 'admin' || role == 'superadmin');
     }
 
-    /**
-     * Normalized lowercase username → { uid }.
-     * - get allowed before login so Signup can check duplicates.
-     * - list denied so names cannot be enumerated.
-     */
     match /usernames/{uname} {
       allow get: if uname.matches('^[a-z0-9_]{3,}$');
       allow list: if false;
@@ -21,21 +16,21 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'email'])
         && request.resource.data.email is string;
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if isAdminOrAbove();
     }
 
     match /documents/{docId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdminOrAbove();
     }
 
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null &&
-        (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+        (request.auth.uid == userId || isAdminOrAbove());
+      allow delete: if isAdminOrAbove();
     }
 
     match /chats/{chatId} {
