@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
   addDoc,
   collection,
@@ -11,6 +12,7 @@ import {
 import { useToast } from "../context/ToastContext";
 import Layout from "../components/Layout";
 import { db } from "../firebase";
+import { useRole } from "../hooks/useRole";
 
 const MAX_FILE_SIZE_MB = 10;
 const UPLOAD_TIMEOUT_MS = 30_000;
@@ -25,6 +27,7 @@ const TYPE_OPTIONS = [
 
 export default function UploadPage() {
   const { toast } = useToast();
+  const { isAdmin, loading: roleLoading, username } = useRole();
   const [refNo, setRefNo] = useState("");
   const [title, setTitle] = useState("");
   const [type, setType] = useState("");
@@ -36,6 +39,9 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
 
   const fileInputRef = useRef(null);
+
+  if (roleLoading) return null;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const detectTypeFromName = (fileName) => {
     const name = fileName.toLowerCase();
@@ -150,6 +156,7 @@ export default function UploadPage() {
         departments,
         createdAt: serverTimestamp(),
         status: "pending",
+        uploadedBy: username || "",
       });
 
       resetForm();

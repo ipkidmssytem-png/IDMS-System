@@ -160,12 +160,13 @@ export default function AdminPanel() {
                             fontSize: 13,
                             cursor: isYou ? "not-allowed" : "pointer",
                             background: isYou ? "#f8fafc" : "#fff",
-                            color: u.role === "admin" ? "#2f80ed" : "#475569",
+                            color: u.role === "superadmin" ? "#d97706" : u.role === "admin" ? "#2f80ed" : "#475569",
                             fontWeight: 600,
                           }}
                         >
                           <option value="user">user</option>
                           <option value="admin">admin</option>
+                          <option value="superadmin">superadmin</option>
                         </select>
                       </td>
                       <td style={{ ...td, color: "#94a3b8", fontSize: 13 }}>

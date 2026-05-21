@@ -376,14 +376,15 @@ export default function Layout({ children }) {
   const location = useLocation();
   const isChatPage = location.pathname === "/chat";
 
-  const { isAdmin } = useRole();
+  const { isAdmin, isSuperAdmin } = useRole();
 
   const links = useMemo(
     () => [
       { to: "/dashboard", label: "Dashboard", icon: <DashboardNavIcon /> },
-      { to: "/upload", label: "Upload Data", icon: <UploadNavIcon /> },
+      { to: "/upload", label: "Upload Data", icon: <UploadNavIcon />, adminOnly: true },
       { to: "/library", label: "Library", icon: <LibraryNavIcon /> },
       { to: "/chat", label: "Chat", icon: <ChatNavIcon /> },
+      { to: "/admin", label: "Admin", icon: <AdminNavIcon />, superAdminOnly: true },
     ],
     []
   );
@@ -641,29 +642,22 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="sidebar-nav">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) =>
-                isActive ? "nav-link active" : "nav-link"
-              }
-            >
-              <span className="nav-link-icon">{link.icon}</span>
-              <span className="nav-link-text">{link.label}</span>
-            </NavLink>
-          ))}
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                isActive ? "nav-link active" : "nav-link"
-              }
-            >
-              <span className="nav-link-icon"><AdminNavIcon /></span>
-              <span className="nav-link-text">Admin</span>
-            </NavLink>
-          )}
+          {links.map((link) => {
+            if (link.superAdminOnly && !isSuperAdmin) return null;
+            if (link.adminOnly && !isAdmin) return null;
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  isActive ? "nav-link active" : "nav-link"
+                }
+              >
+                <span className="nav-link-icon">{link.icon}</span>
+                <span className="nav-link-text">{link.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">

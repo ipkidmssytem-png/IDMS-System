@@ -936,6 +936,7 @@ export default function Library() {
                       direction={sortDirection}
                     />
                   </th>
+                  <th>UPLOADED BY</th>
                   <th
                     className="library-v2-sortable"
                     onClick={() => handleSortColumn("type")}
@@ -983,7 +984,7 @@ export default function Library() {
               <tbody>
                 {paginatedDocs.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="library-v2-empty-cell">
+                    <td colSpan="8" className="library-v2-empty-cell">
                       No documents found
                     </td>
                   </tr>
@@ -1009,6 +1010,10 @@ export default function Library() {
                             <MiniFileIcon type={docItem.type} />
                             <span>{capitalize(docItem.type || "")}</span>
                           </div>
+                        </td>
+
+                        <td style={{ color: "#475569", fontSize: 13 }}>
+                          {docItem.uploadedBy || "—"}
                         </td>
 
                         <td>
