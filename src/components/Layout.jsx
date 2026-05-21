@@ -667,7 +667,7 @@ export default function Layout({ children }) {
         </nav>
 
         <div className="sidebar-footer">
-          © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
+          © {new Date().getFullYear()} Unit Telekomunikasi dan Sistem Maklumat, IPK Perak
         </div>
       </aside>
 
@@ -879,7 +879,7 @@ export default function Layout({ children }) {
 
         <main className="page-content">{children}</main>
         <footer className="main-footer">
-          © {new Date().getFullYear()} Unit Teknologi Maklumat, IPK Perak
+          © {new Date().getFullYear()} Unit Telekomunikasi dan Sistem Maklumat, IPK Perak
         </footer>
       </div>
 
